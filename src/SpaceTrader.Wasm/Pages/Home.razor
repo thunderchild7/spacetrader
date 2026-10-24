@@ -162,29 +162,44 @@ else if (game is GameState play)
                         <div class="charts">
                             <div>
                                 <p class="eyebrow">Short-range chart</p>
+                                <p class="muted">Within @play.Fuel parsecs</p>
                                 <div class="chart-wrap">
-                                    <svg class="chart short" viewBox="@ShortView(play)" role="img" aria-label="Short-range chart centered on @play.Here.Name">
+                                    @{
+                                        var half = ShortHalf(play);
+                                        var wormhole = play.WormholeTarget(play.Current);
+                                    }
+                                    <svg class="chart short" viewBox="@ShortView(play)" role="img" aria-label="Short-range chart of systems within fuel of @play.Here.Name">
                                         @if (play.Fuel > 0)
                                         {
                                             <circle class="fuel" cx="@play.Here.X" cy="@play.Here.Y" r="@play.Fuel" />
                                         }
                                         @foreach (var system in play.Systems)
                                         {
+                                            if (system.Id != play.Current && play.DistanceTo(system.Id) > play.Fuel)
+                                                continue;
                                             var id = system.Id;
                                             var here = id == play.Current;
                                             <circle class="sys" cx="@system.X" cy="@system.Y"
-                                                    r="@(here ? 1.35 : 0.7 + (int)system.Size * 0.12)"
+                                                    r="@(half * (here ? 0.09 : 0.055))"
                                                     fill="@TechColor(system.Tech)"
                                                     opacity="@(system.Visited || here ? 1 : 0.45)"
                                                     stroke="@(id == Focused ? "#f3ead7" : "transparent")"
-                                                    stroke-width="0.28"
+                                                    stroke-width="@(half * 0.012)"
                                                     @onclick="() => selected = id">
                                                 <title>@system.Name</title>
                                             </circle>
-                                            @if (Math.Abs(system.X - play.Here.X) <= Catalog.MaxRange && Math.Abs(system.Y - play.Here.Y) <= Catalog.MaxRange)
-                                            {
-                                                @((MarkupString)$"<text x=\"{system.X}\" y=\"{system.Y - 1.6}\">{System.Net.WebUtility.HtmlEncode(system.Name)}</text>")
-                                            }
+                                            @((MarkupString)ChartLabel(system.X, system.Y, half, system.Name))
+                                        }
+                                        @if (wormhole >= 0)
+                                        {
+                                            var markX = play.Here.X + (int)Math.Round(half * 0.62);
+                                            var markY = play.Here.Y - (int)Math.Round(half * 0.62);
+                                            <circle class="sys worm" cx="@markX" cy="@markY" r="@(half * 0.055)"
+                                                    fill="none" stroke="#8fd0c6" stroke-width="@(half * 0.012)"
+                                                    @onclick="() => selected = wormhole">
+                                                <title>Wormhole to @play.Systems[wormhole].Name</title>
+                                            </circle>
+                                            @((MarkupString)ChartLabel(markX, markY, half, play.Systems[wormhole].Name))
                                         }
                                     </svg>
                                 </div>

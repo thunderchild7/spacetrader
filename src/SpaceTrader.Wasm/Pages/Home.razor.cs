@@ -223,8 +223,20 @@ public partial class Home
 
     bool QuestLinesExist() => game is not null && (game.JaporiQuest == 1 || game.Artifact || game.JarekQuest == 1 || game.MonsterAlive || game.Tribbles > 0);
 
-    static string ShortView(GameState game) =>
-        FormattableString.Invariant($"{game.Here.X - Catalog.MaxRange} {game.Here.Y - Catalog.MaxRange} {Catalog.MaxRange * 2} {Catalog.MaxRange * 2}");
+    static int ShortHalf(GameState game)
+    {
+        var reach = Math.Max(game.Fuel, 1);
+        return reach + Math.Max(2, reach / 6);
+    }
+
+    static string ShortView(GameState game)
+    {
+        var half = ShortHalf(game);
+        return FormattableString.Invariant($"{game.Here.X - half} {game.Here.Y - half} {half * 2} {half * 2}");
+    }
+
+    static string ChartLabel(int x, int y, int half, string name) =>
+        FormattableString.Invariant($"<text x=\"{x}\" y=\"{y - half * 0.14}\" style=\"font-size:{half * 0.08:0.###}px\">{System.Net.WebUtility.HtmlEncode(name)}</text>");
 
     static string GalaxyView(GameState game) =>
         FormattableString.Invariant($"{game.Here.X - Catalog.GalaxyWidth / 2} {game.Here.Y - Catalog.GalaxyHeight / 2} {Catalog.GalaxyWidth} {Catalog.GalaxyHeight}");
