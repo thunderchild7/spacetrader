@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/SpaceTrader.Core/SpaceTrader.Core.csproj" />
+  </Folder>
+  <Folder Name="/src/SpaceTrader.Wasm/">
+    <Project Path="src/SpaceTrader.Wasm/SpaceTrader.Wasm.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/SpaceTrader.Core.Tests/SpaceTrader.Core.Tests.csproj" />
+  </Folder>
+</Solution>

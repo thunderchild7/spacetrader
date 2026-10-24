@@ -1,7 +1,6 @@
-bin
-obj
-*.bin
-*.sav
-*.bak
-*.suo
+bin/
+obj/
+.vs/
 *.user
+publish/
+.DS_Store

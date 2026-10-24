@@ -1,0 +1,656 @@
+@page "/"
+
+<PageTitle>Space Trader</PageTitle>
+
+@if (!ready)
+{
+    <div class="boot">
+        <p class="eyebrow">Space Trader</p>
+        <p>Plotting the sector…</p>
+    </div>
+}
+else if (game is null)
+{
+    <div class="title-screen">
+        <p class="eyebrow">Classic trader</p>
+        <h1>Space Trader</h1>
+        <p class="lede">One hundred twenty-eight systems, a Gnat with a pulse laser, and 1,000 credits. Buy low, keep the hull together, and retire to a moon.</p>
+
+        @if (!string.IsNullOrWhiteSpace(loadError))
+        {
+            <p class="banner">@loadError</p>
+        }
+
+        <section class="panel">
+            <div class="grid-2">
+                <label>
+                    Commander
+                    <input @bind="name" maxlength="20" autocomplete="off" />
+                </label>
+                <label>
+                    Difficulty
+                    <select @bind="difficulty">
+                        @foreach (var level in Enum.GetValues<Difficulty>())
+                        {
+                            <option value="@level">@level</option>
+                        }
+                    </select>
+                </label>
+            </div>
+            <p class="points">@PointsLeft points left. Each skill is 1 to 10, and the four skills total 20.</p>
+            <div class="skill-grid">
+                @for (var slot = 0; slot < 4; slot++)
+                {
+                    var index = slot;
+                    <span>@SkillName(index)</span>
+                    <button type="button" @onclick="() => Bump(index, -1)" aria-label="@($"Lower {SkillName(index)}")">−</button>
+                    <strong>@Skill(index)</strong>
+                    <button type="button" @onclick="() => Bump(index, 1)" aria-label="@($"Raise {SkillName(index)}")">+</button>
+                }
+            </div>
+            <div class="row">
+                <button type="button" @onclick="() => Preset(8, 4, 4, 4)">Pilot</button>
+                <button type="button" @onclick="() => Preset(4, 8, 4, 4)">Fighter</button>
+                <button type="button" @onclick="() => Preset(4, 3, 9, 4)">Trader</button>
+                <button type="button" @onclick="() => Preset(5, 5, 5, 5)">Balanced</button>
+            </div>
+            <div class="row">
+                <button class="primary" type="button" disabled="@(PointsLeft != 0 || string.IsNullOrWhiteSpace(name))" @onclick="Start">Launch</button>
+                @if (hasSave)
+                {
+                    <button type="button" @onclick="Continue">Continue</button>
+                }
+            </div>
+        </section>
+
+        <section>
+            <h2>High scores</h2>
+            @if (scores.Count == 0)
+            {
+                <p class="muted">No retired or lost commanders yet. Scores stay in this browser.</p>
+            }
+            else
+            {
+                <ol class="scores">
+                    @foreach (var entry in scores)
+                    {
+                        <li><strong>@entry.Name</strong> · @entry.End · @entry.Days days · @Money(entry.Worth) · @entry.Difficulty</li>
+                    }
+                </ol>
+            }
+        </section>
+    </div>
+}
+else if (game.End != GameEnd.Playing)
+{
+    <div class="title-screen end-screen">
+        <p class="eyebrow">@(game.End == GameEnd.Retired ? "Retired" : "Lost")</p>
+        <h1>@(game.End == GameEnd.Retired ? "The moon is yours." : "The ship is gone.")</h1>
+        @if (!string.IsNullOrWhiteSpace(game.Banner))
+        {
+            <p class="banner">@game.Banner</p>
+        }
+        <p>@game.CommanderName lasted @game.Days days. Worth @Money(game.Worth). Record @game.RecordName, reputation @game.RepName.</p>
+        <ol class="scores">
+            @foreach (var entry in scores)
+            {
+                <li><strong>@entry.Name</strong> · @entry.End · @entry.Days days · @Money(entry.Worth) · @entry.Difficulty</li>
+            }
+        </ol>
+        <button class="primary" type="button" @onclick="Abandon">New commander</button>
+    </div>
+}
+else if (game is GameState play)
+{
+    <div class="shell">
+        <header class="top">
+            <div class="who">
+                <strong>@play.CommanderName</strong>
+                <span>@play.Here.Name · @play.Spec.Name</span>
+            </div>
+            <div class="stats">
+                <span>Cash <b>@Money(play.Cash)</b></span>
+                <span class="@(play.Debt >= Catalog.DebtWarning ? "warn" : null)">Debt <b>@Money(play.Debt)</b></span>
+                <span>Day <b>@play.Days</b></span>
+                <span>Hull <b>@play.Hull/@play.Spec.Hull</b></span>
+                <span>Fuel <b>@play.Fuel/@play.Spec.Fuel</b></span>
+            </div>
+        </header>
+        <nav class="tabs" aria-label="Shipboard">
+            @foreach (var item in Tabs)
+            {
+                <button type="button" aria-selected="@(tab == item)" @onclick="() => tab = item">@TabLabel(item)</button>
+            }
+        </nav>
+        <main class="stage">
+            @if (!string.IsNullOrWhiteSpace(play.Banner))
+            {
+                <p class="banner">@play.Banner</p>
+            }
+            @if (play.Debt > Catalog.DebtTooLarge)
+            {
+                <p class="banner">The port authority has grounded you. Sell cargo and repay the bank.</p>
+            }
+            @if (play.Here.Event != PortEvent.None)
+            {
+                <section class="panel">
+                    <p class="eyebrow">On the dock</p>
+                    <p>@EventTitle(play.Here.Event)</p>
+                    @if (play.Here.Event == PortEvent.TrainSkill)
+                    {
+                        <div class="row">
+                            @for (var slot = 0; slot < 4; slot++)
+                            {
+                                var index = slot;
+                                <button type="button" @onclick="() => Mutate(() => play.PortAction(index))">Train @SkillName(index)</button>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <button class="primary" type="button" @onclick="() => Mutate(() => play.PortAction())">@EventButton(play.Here.Event)</button>
+                    }
+                </section>
+            }
+
+            @if (tab == "chart")
+            {
+                var focus = play.Systems[Focused];
+                var block = focus.Id == play.Current ? "You are already here" : Block(focus.Id);
+                <div class="layout chart-layout">
+                    <div>
+                        <div class="chart-wrap">
+                            <svg class="chart" viewBox="0 0 154 110" role="img" aria-label="Chart of 128 star systems">
+                                @for (var hole = 0; hole < play.Wormholes.Length; hole++)
+                                {
+                                    var from = play.Systems[play.Wormholes[hole]];
+                                    var to = play.Systems[play.Wormholes[(hole + 1) % play.Wormholes.Length]];
+                                    <line x1="@from.X" y1="@from.Y" x2="@to.X" y2="@to.Y" stroke="#8fd0c6" stroke-width="0.35" stroke-dasharray="1.2 0.8" />
+                                }
+                                @foreach (var system in play.Systems)
+                                {
+                                    var id = system.Id;
+                                    var here = id == play.Current;
+                                    <circle class="sys" cx="@system.X" cy="@system.Y"
+                                            r="@(here ? 2.5 : 1.15 + (int)system.Size * 0.22)"
+                                            fill="@TechColor(system.Tech)"
+                                            opacity="@(system.Visited || here ? 1 : 0.45)"
+                                            stroke="@(id == Focused ? "#f3ead7" : "transparent")"
+                                            stroke-width="0.55"
+                                            @onclick="() => selected = id">
+                                        <title>@system.Name</title>
+                                    </circle>
+                                }
+                                @((MarkupString)$"<text x=\"{play.Here.X}\" y=\"{play.Here.Y - 3}\">{System.Net.WebUtility.HtmlEncode(play.Here.Name)}</text>")
+                                @if (focus.Id != play.Current)
+                                {
+                                    @((MarkupString)$"<text x=\"{focus.X}\" y=\"{focus.Y - 3}\">{System.Net.WebUtility.HtmlEncode(focus.Name)}</text>")
+                                }
+                            </svg>
+                        </div>
+                        <div class="row">
+                            <button type="button" @onclick="() => showAll = !showAll">@(showAll ? "In range only" : "Show every system")</button>
+                        </div>
+                    </div>
+                    <section class="panel">
+                        <p class="eyebrow">@(focus.Id == play.Current ? "Docked" : play.IsWormhole(play.Current, focus.Id) ? "Wormhole" : "Plotted")</p>
+                        <h2>@focus.Name</h2>
+                        <p>@(focus.Visited ? play.Describe(focus) : "No report yet. The chart only knows the name, the tech color, and the distance.")</p>
+                        <p class="nums">@play.DistanceTo(focus.Id) parsecs · departure @Money(play.DepartureCost(focus.Id))</p>
+                        @if (focus.Id != play.Current)
+                        {
+                            <button class="primary" type="button" disabled="@(block is not null)" @onclick="() => Mutate(() => { play.BeginWarp(focus.Id); })">
+                                @(block ?? "Warp")
+                            </button>
+                        }
+                        <div class="routes">
+                            @foreach (var system in Routes())
+                            {
+                                var id = system.Id;
+                                <button type="button" class="route" @onclick="() => selected = id">
+                                    <span>
+                                        <strong>@system.Name</strong><br />
+                                        <small>
+                                            @play.DistanceTo(id) parsecs
+                                            @(play.IsWormhole(play.Current, id) ? " · wormhole" : "")
+                                            @(system.Visited ? "" : " · unvisited")
+                                        </small>
+                                    </span>
+                                    <span class="nums">@Catalog.TechNames[(int)system.Tech]</span>
+                                </button>
+                            }
+                        </div>
+                    </section>
+                </div>
+            }
+            else if (tab == "trade")
+            {
+                <section class="layout">
+                    <p class="nums">Hold @play.UsedBays/@play.CargoBays · @play.FreeBays free</p>
+                    @for (var good = 0; good < Catalog.Goods.Length; good++)
+                    {
+                        var index = good;
+                        var item = Catalog.Goods[index];
+                        var room = MaxBuy(play, index);
+                        <article class="good">
+                            <div>
+                                <strong>@item.Name</strong>
+                                @if (item.Illegal)
+                                {
+                                    <span class="warn"> illegal</span>
+                                }
+                                <div class="nums">Buy @(play.Buy[index] <= 0 ? "—" : Money(play.Buy[index])) · Sell @(play.Sell[index] <= 0 ? "—" : Money(play.Sell[index])) · Stock @play.Here.Stock[index] · Hold @play.Cargo[index]</div>
+                            </div>
+                            <div class="row">
+                                <button type="button" disabled="@(room <= 0)" @onclick="() => Mutate(() => play.BuyGood(index, 1))">Buy 1</button>
+                                <button type="button" disabled="@(room <= 0)" @onclick="() => Mutate(() => play.BuyGood(index, room))">Buy @room</button>
+                                <button type="button" disabled="@(play.Cargo[index] <= 0 || play.Sell[index] <= 0)" @onclick="() => Mutate(() => play.SellGood(index, 1))">Sell 1</button>
+                                <button type="button" disabled="@(play.Cargo[index] <= 0 || play.Sell[index] <= 0)" @onclick="() => Mutate(() => play.SellGood(index, play.Cargo[index]))">Sell all</button>
+                                <button type="button" disabled="@(play.Cargo[index] <= 0)" @onclick="() => Mutate(() => play.Jettison(index))">Dump</button>
+                            </div>
+                        </article>
+                    }
+                </section>
+            }
+            else if (tab == "yard")
+            {
+                <section class="layout">
+                    <div class="row">
+                        <button type="button" @onclick="() => Mutate(play.FillFuel)">Fill fuel · @Money(Math.Max(1, play.Spec.FuelCost))/parsec</button>
+                        <button type="button" @onclick="() => Mutate(play.RepairHull)">Repair hull · @Money(Math.Max(1, play.Spec.Repair))/point</button>
+                        <button type="button" disabled="@play.EscapePod" @onclick="() => Mutate(play.BuyPod)">Escape pod · @Money(Catalog.PodPrice)</button>
+                    </div>
+                    <h2>Ships</h2>
+                    <p class="muted">The yard sells hulls this system can build. Trade-in keeps an escape pod for 200 credits and clears cargo and fitted gear.</p>
+                    @for (var type = 0; type < 10; type++)
+                    {
+                        var spec = Catalog.Ships[type];
+                        if (spec.MinTech > play.Here.Tech || type == play.Ship)
+                            continue;
+                        var id = type;
+                        var due = ShipDue(play, spec);
+                        <article class="ship-row">
+                            <div>
+                                <strong>@spec.Name</strong>
+                                <div class="nums">@spec.Bays bays · @spec.Weapons weapons · @spec.Shields shields · @spec.Gadgets gadgets · crew @spec.Crew · fuel @spec.Fuel · hull @spec.Hull</div>
+                            </div>
+                            <button type="button" @onclick="() => Mutate(() => play.BuyShip(id))">@(due >= 0 ? $"Pay {Money(due)}" : $"Receive {Money(-due)}")</button>
+                        </article>
+                    }
+                    <h2>Weapons</h2>
+                    @if (play.Spec.Weapons == 0)
+                    {
+                        <p class="muted">This hull has no weapon mounts.</p>
+                    }
+                    else
+                    {
+                        @for (var slot = 0; slot < play.Spec.Weapons; slot++)
+                        {
+                            var index = slot;
+                            var fitted = play.Weapons[index];
+                            if (fitted < 0)
+                                continue;
+                            <article class="ship-row">
+                                <span>@Catalog.Weapons[fitted].Name</span>
+                                <button type="button" @onclick="() => Mutate(() => play.SellWeapon(index))">Sell @Money(Catalog.Weapons[fitted].Price * 3 / 4)</button>
+                            </article>
+                        }
+                        @if (SlotFree(play.Weapons, play.Spec.Weapons))
+                        {
+                            @for (var id = 0; id < Catalog.Weapons.Length; id++)
+                            {
+                                var weapon = Catalog.Weapons[id];
+                                if (weapon.Tech > play.Here.Tech)
+                                    continue;
+                                var index = id;
+                                <article class="ship-row">
+                                    <div>
+                                        <strong>@weapon.Name</strong>
+                                        <div class="nums">Power @weapon.Power@(weapon.Disabling ? " · disabling" : "")</div>
+                                    </div>
+                                    <button type="button" @onclick="() => Mutate(() => play.BuyWeapon(index))">Buy @Money(play.GearPrice(weapon.Price))</button>
+                                </article>
+                            }
+                        }
+                    }
+                    <h2>Shields</h2>
+                    @if (play.Spec.Shields == 0)
+                    {
+                        <p class="muted">This hull has no shield mounts.</p>
+                    }
+                    else
+                    {
+                        @for (var slot = 0; slot < play.Spec.Shields; slot++)
+                        {
+                            var index = slot;
+                            var fitted = play.Shields[index];
+                            if (fitted < 0)
+                                continue;
+                            <article class="ship-row">
+                                <span>@Catalog.Shields[fitted].Name</span>
+                                <button type="button" @onclick="() => Mutate(() => play.SellShield(index))">Sell @Money(Catalog.Shields[fitted].Price * 3 / 4)</button>
+                            </article>
+                        }
+                        @if (SlotFree(play.Shields, play.Spec.Shields))
+                        {
+                            @for (var id = 0; id < Catalog.Shields.Length; id++)
+                            {
+                                var shield = Catalog.Shields[id];
+                                if (shield.Tech > play.Here.Tech)
+                                    continue;
+                                var index = id;
+                                <article class="ship-row">
+                                    <div>
+                                        <strong>@shield.Name</strong>
+                                        <div class="nums">Strength @shield.Power</div>
+                                    </div>
+                                    <button type="button" @onclick="() => Mutate(() => play.BuyShield(index))">Buy @Money(play.GearPrice(shield.Price))</button>
+                                </article>
+                            }
+                        }
+                    }
+                    <h2>Gadgets</h2>
+                    @if (play.Spec.Gadgets == 0)
+                    {
+                        <p class="muted">This hull has no gadget slots.</p>
+                    }
+                    else
+                    {
+                        @for (var slot = 0; slot < play.Spec.Gadgets; slot++)
+                        {
+                            var index = slot;
+                            var fitted = play.Gadgets[index];
+                            if (fitted < 0)
+                                continue;
+                            <article class="ship-row">
+                                <span>@Catalog.Gadgets[fitted].Name</span>
+                                <button type="button" @onclick="() => Mutate(() => play.SellGadget(index))">Sell @Money(Catalog.Gadgets[fitted].Price * 3 / 4)</button>
+                            </article>
+                        }
+                        @if (SlotFree(play.Gadgets, play.Spec.Gadgets))
+                        {
+                            @for (var id = 0; id < Catalog.Gadgets.Length; id++)
+                            {
+                                var gadget = Catalog.Gadgets[id];
+                                if (gadget.Tech > play.Here.Tech)
+                                    continue;
+                                var index = id;
+                                <article class="ship-row">
+                                    <div>
+                                        <strong>@gadget.Name</strong>
+                                        <div class="nums">@gadget.Blurb</div>
+                                    </div>
+                                    <button type="button" @onclick="() => Mutate(() => play.BuyGadget(index))">Buy @Money(play.GearPrice(gadget.Price))</button>
+                                </article>
+                            }
+                        }
+                    }
+                </section>
+            }
+            else if (tab == "ship")
+            {
+                <section class="layout">
+                    <article class="panel">
+                        <h2>@play.Spec.Name</h2>
+                        <p>Worth @Money(play.Worth). Trade-in value @Money(play.ShipWorth). @(play.EscapePod ? "Escape pod fitted." : "No escape pod.") @(play.Insurance ? $"Insured, premium {Money(play.InsuranceDue)}." : "Uninsured.")</p>
+                        <p class="nums">Hull</p>
+                        <div class="meter hull"><span style="width:@(Percent(play.Hull, play.Spec.Hull))%"></span></div>
+                        <p class="nums">Fuel</p>
+                        <div class="meter"><span style="width:@(Percent(play.Fuel, play.Spec.Fuel))%"></span></div>
+                        <p class="nums">Shields @play.ShieldCharge/@play.ShieldMax()</p>
+                        <div class="meter @(play.ShieldMax() > 0 && play.ShieldCharge < play.ShieldMax() / 3 ? "bad" : null)"><span style="width:@(Percent(play.ShieldCharge, Math.Max(1, play.ShieldMax())))%"></span></div>
+                        <p>Pilot @play.Pilot (effective @play.Skill(0)) · Fighter @play.Fighter (effective @play.Skill(1)) · Trader @play.Trader (effective @play.Skill(2)) · Engineer @play.Engineer (effective @play.Skill(3))</p>
+                        <p>Record @play.RecordName (@play.PoliceScore) · Reputation @play.RepName (@play.Reputation)</p>
+                        <p class="nums">Quarters @play.CommanderQuarters/@play.Spec.Crew · bays @play.UsedBays/@play.CargoBays · tribbles @play.Tribbles.ToString("N0")</p>
+                    </article>
+                    <h2>Cargo</h2>
+                    @if (play.UsedBays == 0 && !play.Artifact)
+                    {
+                        <p class="muted">The hold is empty.</p>
+                    }
+                    @for (var good = 0; good < play.Cargo.Length; good++)
+                    {
+                        if (play.Cargo[good] <= 0)
+                            continue;
+                        <article class="ship-row">
+                            <span>@Catalog.Goods[good].Name</span>
+                            <span class="nums">@play.Cargo[good] · paid @Money(play.Paid[good])</span>
+                        </article>
+                    }
+                    @if (play.Artifact)
+                    {
+                        <article class="ship-row"><span>Alien artifact</span><span class="nums">does not use a bay</span></article>
+                    }
+                </section>
+            }
+            else if (tab == "crew")
+            {
+                <section class="layout">
+                    <p class="nums">Quarters @play.CommanderQuarters/@play.Spec.Crew · wages @Money(play.Wages) each warp</p>
+                    <h2>Aboard</h2>
+                    <article class="person">
+                        <div>
+                            <strong>@play.CommanderName</strong>
+                            <div class="nums">Commander · P@play.Pilot F@play.Fighter T@play.Trader E@play.Engineer</div>
+                        </div>
+                    </article>
+                    @foreach (var member in play.Crew.Select((person, index) => (person, index)).Where(item => item.person.Hired))
+                    {
+                        var index = member.index;
+                        <article class="person">
+                            <div>
+                                <strong>@member.person.Name</strong>
+                                <div class="nums">@member.person.Role · P@member.person.Pilot F@member.person.Fighter T@member.person.Trader E@member.person.Engineer · @Money(member.person.Wage)</div>
+                            </div>
+                            <button type="button" @onclick="() => Mutate(() => play.Dismiss(index))">Dismiss</button>
+                        </article>
+                    }
+                    <h2>On station</h2>
+                    @{
+                        var locals = play.Crew.Select((person, index) => (person, index)).Where(item => !item.person.Hired && item.person.System == play.Current && item.person.Role != CrewRole.Jarek).ToList();
+                    }
+                    @if (locals.Count == 0)
+                    {
+                        <p class="muted">No mercenaries are waiting here.</p>
+                    }
+                    @foreach (var member in locals)
+                    {
+                        var index = member.index;
+                        <article class="person">
+                            <div>
+                                <strong>@member.person.Name</strong>
+                                <div class="nums">@member.person.Role · P@member.person.Pilot F@member.person.Fighter T@member.person.Trader E@member.person.Engineer · @Money(member.person.Wage)</div>
+                            </div>
+                            <button type="button" @onclick="() => Mutate(() => play.Hire(index))">Hire</button>
+                        </article>
+                    }
+                </section>
+            }
+            else if (tab == "bank")
+            {
+                var room = Math.Max(0, play.MaxLoan - play.Debt);
+                var repay = Math.Min(play.Cash, play.Debt);
+                <section class="panel">
+                    <p>Cash @Money(play.Cash). Debt @Money(play.Debt). The bank will lend up to @Money(play.MaxLoan). Interest is @Money(play.InterestDue) the next time you warp.</p>
+                    <p class="nums">A clean record unlocks more credit. A criminal record caps the loan at 500 credits. At 100,000 the port grounds the ship.</p>
+                    <div class="row">
+                        <button type="button" disabled="@(room <= 0)" @onclick="() => Mutate(() => play.Borrow(Math.Min(1000, room)))">Borrow @Money(Math.Min(1000, Math.Max(room, 0)))</button>
+                        <button type="button" disabled="@(room <= 0)" @onclick="() => Mutate(() => play.Borrow(room))">Borrow the rest</button>
+                        <button type="button" disabled="@(repay <= 0)" @onclick="() => Mutate(() => play.Repay(Math.Min(1000, repay)))">Repay @Money(Math.Min(1000, repay))</button>
+                        <button type="button" disabled="@(repay <= 0)" @onclick="() => Mutate(() => play.Repay(repay))">Repay all</button>
+                    </div>
+                    <p>@(play.Insurance ? $"Insurance is on. No-claim bonus {play.NoClaim}. Next premium {Money(play.InsuranceDue)}." : "Insurance is off. The bank requires an escape pod.")</p>
+                    <button type="button" @onclick="() => Mutate(play.ToggleInsurance)">@(play.Insurance ? "Cancel insurance" : "Buy insurance")</button>
+                </section>
+            }
+            else
+            {
+                <section class="layout">
+                    <article class="panel">
+                        <p class="eyebrow">This system</p>
+                        <p>@play.Describe(play.Here)</p>
+                    </article>
+                    <article class="panel">
+                        <p class="eyebrow">Errands</p>
+                        @foreach (var line in QuestLines())
+                        {
+                            <p>@line</p>
+                        }
+                    </article>
+                    <ol class="log">
+                        @foreach (var line in play.LogLines.AsEnumerable().Reverse())
+                        {
+                            <li>@line</li>
+                        }
+                    </ol>
+                    <button class="danger" type="button" @onclick="Abandon">Abandon this game</button>
+                </section>
+            }
+        </main>
+    </div>
+
+    @if (play.Encounter is { } encounter)
+    {
+        <div class="overlay">
+            <section class="encounter" role="dialog" aria-labelledby="encounter-title">
+                <p class="eyebrow">@encounter.Kind</p>
+                <h2 id="encounter-title">@encounter.Title</h2>
+                <p>@encounter.Detail</p>
+                <p class="nums">Hull @encounter.Hull/@encounter.MaxHull · shields @encounter.Shield/@encounter.MaxShield · guns @encounter.Power</p>
+                <div class="meter hull @(encounter.Hull * 3 < encounter.MaxHull ? "bad" : null)"><span style="width:@(Percent(encounter.Hull, encounter.MaxHull))%"></span></div>
+                @if (encounter.Notes.Count > 0)
+                {
+                    <div class="notes">
+                        @foreach (var note in encounter.Notes)
+                        {
+                            <span>@note</span>
+                        }
+                    </div>
+                }
+                @if (encounter.TradeGood >= 0 && encounter.TradeQty > 0)
+                {
+                    <p>They offer @encounter.TradeQty @Catalog.Goods[encounter.TradeGood].Name at @Money(encounter.TradePrice) each.</p>
+                }
+                <div class="row">
+                    @if (encounter.Destroyed || encounter.Disabled)
+                    {
+                        <button class="primary" type="button" @onclick='() => Fight("plunder")'>Plunder</button>
+                        <button type="button" @onclick='() => Fight("leave")'>Leave them</button>
+                    }
+                    else if (encounter.Fleeing)
+                    {
+                        <button class="primary" type="button" @onclick='() => Fight("attack")'>Attack</button>
+                        <button type="button" @onclick='() => Fight("ignore")'>Let them go</button>
+                    }
+                    else if (encounter.Kind == EncounterKind.Police && !encounter.Hostile)
+                    {
+                        <button class="primary" type="button" @onclick='() => Fight("submit")'>Submit · fine @Money(Math.Max(encounter.Fine, 200))</button>
+                        <button type="button" @onclick='() => Fight("attack")'>Attack</button>
+                        @if (encounter.Bribe > 0)
+                        {
+                            <button type="button" @onclick='() => Fight("bribe")'>Bribe @Money(encounter.Bribe)</button>
+                        }
+                        <button type="button" @onclick='() => Fight("flee")'>Flee</button>
+                    }
+                    else if (encounter.Kind == EncounterKind.Trader && !encounter.Hostile)
+                    {
+                        <button class="primary" type="button" disabled="@(encounter.TradeGood < 0)" @onclick='() => Fight("buy")'>Buy</button>
+                        <button type="button" disabled="@(encounter.TradeGood < 0)" @onclick='() => Fight("sell")'>Sell</button>
+                        <button type="button" @onclick='() => Fight("ignore")'>Pass</button>
+                        <button type="button" @onclick='() => Fight("attack")'>Attack</button>
+                    }
+                    else
+                    {
+                        <button class="primary" type="button" @onclick='() => Fight("attack")'>Attack</button>
+                        <button type="button" @onclick='() => Fight("flee")'>Flee</button>
+                        <button type="button" @onclick='() => Fight("surrender")'>Surrender</button>
+                        @if (encounter.Bribe > 0)
+                        {
+                            <button type="button" @onclick='() => Fight("bribe")'>Bribe @Money(encounter.Bribe)</button>
+                        }
+                    }
+                </div>
+            </section>
+        </div>
+    }
+}
+
+@code {
+    static readonly string[] Tabs = ["chart", "trade", "yard", "ship", "crew", "bank", "news"];
+
+    static string TabLabel(string tab) => tab switch
+    {
+        "chart" => "Chart",
+        "trade" => "Trade",
+        "yard" => "Yard",
+        "ship" => "Ship",
+        "crew" => "Crew",
+        "bank" => "Bank",
+        _ => "News"
+    };
+
+    static string SkillName(int slot) => slot switch
+    {
+        0 => "Pilot",
+        1 => "Fighter",
+        2 => "Trader",
+        _ => "Engineer"
+    };
+
+    static string EventTitle(PortEvent ev) => ev switch
+    {
+        PortEvent.Lottery => "A lottery clerk is paying out to new commanders.",
+        PortEvent.Moon => "A moon is for sale. 500,000 credits, and you leave the spaceways.",
+        PortEvent.EraseRecord => "A fixer can wipe your police record for 5,000 credits.",
+        PortEvent.TrainSkill => "A tutor will raise one skill for 3,000 credits.",
+        PortEvent.Tribble => "A trader offers one tribble for 1,000 credits.",
+        PortEvent.TribbleBuyer => "A collector will pay half a credit per tribble, up to 5,000 of them.",
+        PortEvent.Japori => "Japori needs ten bays of medicine carried as antidote.",
+        PortEvent.JaporiDelivery => "The antidote is due here. It takes ten medicine from the hold.",
+        PortEvent.Artifact => "An alien artifact can ride along. It does not use a cargo bay.",
+        PortEvent.ArtifactDelivery => "A buyer will pay 20,000 credits for the artifact.",
+        PortEvent.Jarek => "Ambassador Jarek needs a free crew quarter.",
+        PortEvent.JarekDrop => "This is Jarek's stop. He pays 5,000 credits.",
+        PortEvent.Monster => "Acamar is asking for a captain willing to hunt the space monster.",
+        PortEvent.SealedCanisters => "Three sealed canisters cost 1,000 credits and three empty bays.",
+        _ => ""
+    };
+
+    static string EventButton(PortEvent ev) => ev switch
+    {
+        PortEvent.Lottery => "Claim 1,000 cr.",
+        PortEvent.Moon => "Buy the moon",
+        PortEvent.EraseRecord => "Erase record",
+        PortEvent.Tribble => "Buy a tribble",
+        PortEvent.TribbleBuyer => "Sell tribbles",
+        PortEvent.Japori => "Take the antidote",
+        PortEvent.JaporiDelivery => "Deliver the antidote",
+        PortEvent.Artifact => "Take the artifact",
+        PortEvent.ArtifactDelivery => "Sell the artifact",
+        PortEvent.Jarek => "Board Jarek",
+        PortEvent.JarekDrop => "Drop Jarek",
+        PortEvent.Monster => "Hunt the monster",
+        PortEvent.SealedCanisters => "Buy the canisters",
+        _ => "Continue"
+    };
+
+    static int MaxBuy(GameState state, int good)
+    {
+        if (good < 0 || state.Buy[good] <= 0 || state.FreeBays <= 0)
+            return 0;
+        return Math.Min(state.Here.Stock[good], Math.Min(state.FreeBays, state.Cash / state.Buy[good]));
+    }
+
+    static int ShipDue(GameState state, ShipSpec spec) =>
+        spec.Price - state.ShipWorth + (state.EscapePod ? Catalog.PodTransfer : 0);
+
+    Task Fight(string action) => Mutate(() => game!.Act(action));
+
+    static bool SlotFree(int[] slots, int capacity)
+    {
+        for (var i = 0; i < capacity && i < slots.Length; i++)
+            if (slots[i] < 0)
+                return true;
+        return false;
+    }
+}
