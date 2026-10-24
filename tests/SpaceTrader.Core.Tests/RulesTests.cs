@@ -49,6 +49,45 @@ public class RulesTests
     }
 
     [Fact]
+    public void TargetQuotesCompareAverageSellPricesWithTheLocalBuyPrice()
+    {
+        var game = NewGame();
+        var other = game.Systems.First(system => system.Id != game.Current);
+        other.Tech = TechLevel.HiTech;
+        other.Size = Size.Medium;
+        other.Resource = Resource.SweetOceans;
+        other.Pressure = Pressure.Drought;
+        other.Visited = false;
+
+        var water = (int)Good.Water;
+        var hidden = game.Quote(other.Id, water);
+        var withoutResource = Catalog.StandardPrice(Catalog.Goods[water], water, other.Tech, other.Size, other.PoliticsInfo, Resource.Nothing);
+        Assert.Equal(withoutResource, hidden.Average);
+        Assert.NotEqual(withoutResource * 3 / 2, hidden.Average);
+
+        other.Visited = true;
+        var known = game.Quote(other.Id, water);
+        var withResource = Catalog.StandardPrice(Catalog.Goods[water], water, other.Tech, other.Size, other.PoliticsInfo, Resource.SweetOceans);
+        Assert.Equal(withResource, known.Average);
+        Assert.True(known.Average < hidden.Average);
+
+        game.Buy[water] = 1;
+        game.Here.Stock[water] = 4;
+        var deal = game.Quote(other.Id, water);
+        Assert.Equal(withResource - 1, deal.Difference);
+        Assert.Equal(100 * (withResource - 1), deal.Percent);
+        Assert.True(deal.WorthBuying);
+
+        game.Here.Stock[water] = 0;
+        Assert.False(game.Quote(other.Id, water).WorthBuying);
+
+        other.Tech = TechLevel.PreAgricultural;
+        var robots = game.Quote(other.Id, (int)Good.Robots);
+        Assert.Equal(0, robots.Average);
+        Assert.Null(robots.Difference);
+    }
+
+    [Fact]
     public void BuyingCostsMoreThanTheLocalSellPrice()
     {
         var game = NewGame();

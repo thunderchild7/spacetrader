@@ -202,6 +202,55 @@ else if (game is GameState play)
                             <button class="primary" type="button" disabled="@(block is not null)" @onclick="() => Mutate(() => { play.BeginWarp(focus.Id); })">
                                 @(block ?? "Warp")
                             </button>
+                            <div class="row">
+                                <button type="button" @onclick="() => StepTarget(-1)" aria-label="Previous system in range">‹</button>
+                                <button type="button" @onclick="() => StepTarget(1)" aria-label="Next system in range">›</button>
+                                <button type="button" @onclick="() => showDiff = !showDiff">@(showDiff ? "Absolute prices" : "Price differences")</button>
+                            </div>
+                            <p class="muted">Average sell price at @focus.Name against the buy price here. A gold row means the average is higher and the good is in stock. Size, government, and tech level count. A special resource counts after you visit. Wars, plagues, and a fence's cut do not.</p>
+                            <div class="compare-wrap">
+                                <table class="compare">
+                                    <thead>
+                                        <tr>
+                                            <th>Good</th>
+                                            <th>Buy here</th>
+                                            @if (showDiff)
+                                            {
+                                                <th>+/−</th>
+                                                <th>%</th>
+                                            }
+                                            else
+                                            {
+                                                <th>There</th>
+                                            }
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @for (var good = 0; good < Catalog.Goods.Length; good++)
+                                        {
+                                            var quote = play.Quote(focus.Id, good);
+                                            var deal = quote.WorthBuying ? "deal" : null;
+                                            <tr>
+                                                <td class="@deal">@Catalog.Goods[good].Name</td>
+                                                <td>@(play.Buy[good] > 0 ? Money(play.Buy[good]) : "—")</td>
+                                                @if (showDiff)
+                                                {
+                                                    <td class="@deal">@(quote.Difference is int gap ? SignedMoney(gap) : "—")</td>
+                                                    <td class="@deal">@(quote.Percent is int pct ? SignedPercent(pct) : "—")</td>
+                                                }
+                                                else
+                                                {
+                                                    <td class="@deal">@(quote.Average > 0 ? Money(quote.Average) : "—")</td>
+                                                }
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        }
+                        else
+                        {
+                            <p class="muted">Select another system to compare its average sell prices with what you pay here.</p>
                         }
                         <div class="routes">
                             @foreach (var system in Routes())

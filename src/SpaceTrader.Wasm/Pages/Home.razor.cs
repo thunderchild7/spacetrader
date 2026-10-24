@@ -25,6 +25,7 @@ public partial class Home
     string tab = "chart";
     int selected = -1;
     bool showAll;
+    bool showDiff;
     List<ScoreEntry> scores = [];
 
     int PointsLeft => 20 - (pilot + fighter + trader + engineer);
@@ -169,6 +170,23 @@ public partial class Home
         return null;
     }
 
+    void StepTarget(int delta)
+    {
+        if (game is null || delta == 0)
+            return;
+        var destinations = game.Systems
+            .Where(system => system.Id != game.Current && (game.DistanceTo(system.Id) <= game.Fuel || game.IsWormhole(game.Current, system.Id)))
+            .Select(system => system.Id)
+            .ToList();
+        if (destinations.Count == 0)
+            return;
+        var index = destinations.IndexOf(Focused);
+        index = index < 0
+            ? (delta > 0 ? 0 : destinations.Count - 1)
+            : (destinations.Count + index + Math.Sign(delta)) % destinations.Count;
+        selected = destinations[index];
+    }
+
     IEnumerable<StarSystem> Routes()
     {
         if (game is null)
@@ -206,6 +224,10 @@ public partial class Home
     bool QuestLinesExist() => game is not null && (game.JaporiQuest == 1 || game.Artifact || game.JarekQuest == 1 || game.MonsterAlive || game.Tribbles > 0);
 
     static string Money(int value) => value.ToString("N0") + " cr.";
+
+    static string SignedMoney(int value) => (value > 0 ? "+" : "") + Money(value);
+
+    static string SignedPercent(int value) => (value > 0 ? "+" : "") + value.ToString("N0") + "%";
 
     static string TechColor(TechLevel tech) => tech switch
     {

@@ -17,6 +17,8 @@ public sealed class CrewMember
     public int Wage => (Pilot + Fighter + Trader + Engineer) * 3;
 }
 
+public readonly record struct TradeQuote(int Average, int? Difference, int? Percent, bool WorthBuying);
+
 public sealed class Encounter
 {
     public EncounterKind Kind { get; set; }
@@ -222,6 +224,18 @@ public sealed partial class GameState
     }
 
     public int DistanceTo(int system) => Catalog.Distance(Here.X, Here.Y, Systems[system].X, Systems[system].Y);
+
+    public TradeQuote Quote(int systemId, int good)
+    {
+        var system = Systems[systemId];
+        var resource = system.Visited ? system.Resource : Resource.Nothing;
+        var average = Catalog.StandardPrice(Catalog.Goods[good], good, system.Tech, system.Size, system.PoliticsInfo, resource);
+        if (average <= 0 || Buy[good] <= 0)
+            return new TradeQuote(average, null, null, false);
+
+        var difference = average - Buy[good];
+        return new TradeQuote(average, difference, 100 * difference / Buy[good], difference > 0 && Here.Stock[good] > 0);
+    }
 
     public int WormholeTarget(int system)
     {
