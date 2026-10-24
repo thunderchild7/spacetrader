@@ -178,6 +178,8 @@ input, select {
     gap: 1rem;
 }
 
+.charts { display: grid; gap: .75rem; }
+
 .chart-wrap {
     background: #05070c;
     border: 1px solid var(--line);
@@ -185,9 +187,15 @@ input, select {
     overflow: hidden;
 }
 
-.chart { width: 100%; height: auto; display: block; min-height: 240px; }
+.chart { width: 100%; height: auto; display: block; min-height: 180px; }
 
-.chart text { fill: var(--muted); font-size: 3px; font-family: ui-monospace, Menlo, sans-serif; }
+.chart text { fill: var(--muted); font-size: 3px; font-family: ui-monospace, Menlo, sans-serif; pointer-events: none; }
+
+.chart.short text { font-size: 1.7px; }
+
+.chart .fuel { fill: none; stroke: #e0b15a; stroke-width: 0.45; stroke-opacity: .7; pointer-events: none; }
+
+.chart.short .fuel { stroke-width: 0.22; }
 
 .sys { cursor: pointer; }
 
@@ -290,7 +298,7 @@ input, select {
 #blazor-error-ui .dismiss { cursor: pointer; margin-left: 1rem; }
 
 @media (min-width: 720px) {
-    .grid-2 { grid-template-columns: 1fr 1fr; }
+    .grid-2, .charts { grid-template-columns: 1fr 1fr; }
 }
 
 @media (min-width: 960px) {

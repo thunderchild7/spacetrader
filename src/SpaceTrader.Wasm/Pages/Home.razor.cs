@@ -223,6 +223,12 @@ public partial class Home
 
     bool QuestLinesExist() => game is not null && (game.JaporiQuest == 1 || game.Artifact || game.JarekQuest == 1 || game.MonsterAlive || game.Tribbles > 0);
 
+    static string ShortView(GameState game) =>
+        FormattableString.Invariant($"{game.Here.X - Catalog.MaxRange} {game.Here.Y - Catalog.MaxRange} {Catalog.MaxRange * 2} {Catalog.MaxRange * 2}");
+
+    static string GalaxyView(GameState game) =>
+        FormattableString.Invariant($"{game.Here.X - Catalog.GalaxyWidth / 2} {game.Here.Y - Catalog.GalaxyHeight / 2} {Catalog.GalaxyWidth} {Catalog.GalaxyHeight}");
+
     static string Money(int value) => value.ToString("N0") + " cr.";
 
     static string SignedMoney(int value) => (value > 0 ? "+" : "") + Money(value);

@@ -159,34 +159,72 @@ else if (game is GameState play)
                 var block = focus.Id == play.Current ? "You are already here" : Block(focus.Id);
                 <div class="layout chart-layout">
                     <div>
-                        <div class="chart-wrap">
-                            <svg class="chart" viewBox="0 0 154 110" role="img" aria-label="Chart of 128 star systems">
-                                @for (var hole = 0; hole < play.Wormholes.Length; hole++)
-                                {
-                                    var from = play.Systems[play.Wormholes[hole]];
-                                    var to = play.Systems[play.Wormholes[(hole + 1) % play.Wormholes.Length]];
-                                    <line x1="@from.X" y1="@from.Y" x2="@to.X" y2="@to.Y" stroke="#8fd0c6" stroke-width="0.35" stroke-dasharray="1.2 0.8" />
-                                }
-                                @foreach (var system in play.Systems)
-                                {
-                                    var id = system.Id;
-                                    var here = id == play.Current;
-                                    <circle class="sys" cx="@system.X" cy="@system.Y"
-                                            r="@(here ? 2.5 : 1.15 + (int)system.Size * 0.22)"
-                                            fill="@TechColor(system.Tech)"
-                                            opacity="@(system.Visited || here ? 1 : 0.45)"
-                                            stroke="@(id == Focused ? "#f3ead7" : "transparent")"
-                                            stroke-width="0.55"
-                                            @onclick="() => selected = id">
-                                        <title>@system.Name</title>
-                                    </circle>
-                                }
-                                @((MarkupString)$"<text x=\"{play.Here.X}\" y=\"{play.Here.Y - 3}\">{System.Net.WebUtility.HtmlEncode(play.Here.Name)}</text>")
-                                @if (focus.Id != play.Current)
-                                {
-                                    @((MarkupString)$"<text x=\"{focus.X}\" y=\"{focus.Y - 3}\">{System.Net.WebUtility.HtmlEncode(focus.Name)}</text>")
-                                }
-                            </svg>
+                        <div class="charts">
+                            <div>
+                                <p class="eyebrow">Short-range chart</p>
+                                <div class="chart-wrap">
+                                    <svg class="chart short" viewBox="@ShortView(play)" role="img" aria-label="Short-range chart centered on @play.Here.Name">
+                                        @if (play.Fuel > 0)
+                                        {
+                                            <circle class="fuel" cx="@play.Here.X" cy="@play.Here.Y" r="@play.Fuel" />
+                                        }
+                                        @foreach (var system in play.Systems)
+                                        {
+                                            var id = system.Id;
+                                            var here = id == play.Current;
+                                            <circle class="sys" cx="@system.X" cy="@system.Y"
+                                                    r="@(here ? 1.35 : 0.7 + (int)system.Size * 0.12)"
+                                                    fill="@TechColor(system.Tech)"
+                                                    opacity="@(system.Visited || here ? 1 : 0.45)"
+                                                    stroke="@(id == Focused ? "#f3ead7" : "transparent")"
+                                                    stroke-width="0.28"
+                                                    @onclick="() => selected = id">
+                                                <title>@system.Name</title>
+                                            </circle>
+                                            @if (Math.Abs(system.X - play.Here.X) <= Catalog.MaxRange && Math.Abs(system.Y - play.Here.Y) <= Catalog.MaxRange)
+                                            {
+                                                @((MarkupString)$"<text x=\"{system.X}\" y=\"{system.Y - 1.6}\">{System.Net.WebUtility.HtmlEncode(system.Name)}</text>")
+                                            }
+                                        }
+                                    </svg>
+                                </div>
+                            </div>
+                            <div>
+                                <p class="eyebrow">Galactic chart</p>
+                                <div class="chart-wrap">
+                                    <svg class="chart" viewBox="@GalaxyView(play)" role="img" aria-label="Galactic chart centered on @play.Here.Name">
+                                        @for (var hole = 0; hole < play.Wormholes.Length; hole++)
+                                        {
+                                            var from = play.Systems[play.Wormholes[hole]];
+                                            var to = play.Systems[play.Wormholes[(hole + 1) % play.Wormholes.Length]];
+                                            <line x1="@from.X" y1="@from.Y" x2="@to.X" y2="@to.Y" stroke="#8fd0c6" stroke-width="0.35" stroke-dasharray="1.2 0.8" />
+                                        }
+                                        @if (play.Fuel > 0)
+                                        {
+                                            <circle class="fuel" cx="@play.Here.X" cy="@play.Here.Y" r="@play.Fuel" />
+                                        }
+                                        @foreach (var system in play.Systems)
+                                        {
+                                            var id = system.Id;
+                                            var here = id == play.Current;
+                                            <circle class="sys" cx="@system.X" cy="@system.Y"
+                                                    r="@(here ? 2.5 : 1.15 + (int)system.Size * 0.22)"
+                                                    fill="@TechColor(system.Tech)"
+                                                    opacity="@(system.Visited || here ? 1 : 0.45)"
+                                                    stroke="@(id == Focused ? "#f3ead7" : "transparent")"
+                                                    stroke-width="0.55"
+                                                    @onclick="() => selected = id">
+                                                <title>@system.Name</title>
+                                            </circle>
+                                        }
+                                        @((MarkupString)$"<text x=\"{play.Here.X}\" y=\"{play.Here.Y - 3}\">{System.Net.WebUtility.HtmlEncode(play.Here.Name)}</text>")
+                                        @if (focus.Id != play.Current)
+                                        {
+                                            @((MarkupString)$"<text x=\"{focus.X}\" y=\"{focus.Y - 3}\">{System.Net.WebUtility.HtmlEncode(focus.Name)}</text>")
+                                        }
+                                    </svg>
+                                </div>
+                            </div>
                         </div>
                         <div class="row">
                             <button type="button" @onclick="() => showAll = !showAll">@(showAll ? "In range only" : "Show every system")</button>
