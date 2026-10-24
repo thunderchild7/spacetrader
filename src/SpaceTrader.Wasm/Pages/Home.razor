@@ -163,12 +163,12 @@ else if (game is GameState play)
                             <div>
                                 <p class="eyebrow">Short-range chart</p>
                                 <p class="muted">Within @play.Fuel parsecs</p>
-                                <div class="chart-wrap">
+                                <div class="chart-wrap round">
                                     @{
                                         var half = ShortHalf(play);
                                         var wormhole = play.WormholeTarget(play.Current);
                                     }
-                                    <svg class="chart short" viewBox="@ShortView(play)" role="img" aria-label="Short-range chart of systems within fuel of @play.Here.Name">
+                                    <svg class="chart short" viewBox="@ShortView(play)" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Short-range chart of systems within fuel of @play.Here.Name">
                                         @if (play.Fuel > 0)
                                         {
                                             <circle class="fuel" cx="@play.Here.X" cy="@play.Here.Y" r="@play.Fuel" />
@@ -192,8 +192,8 @@ else if (game is GameState play)
                                         }
                                         @if (wormhole >= 0)
                                         {
-                                            var markX = play.Here.X + (int)Math.Round(half * 0.62);
-                                            var markY = play.Here.Y - (int)Math.Round(half * 0.62);
+                                            var markX = play.Here.X + (int)Math.Round(half * 0.48);
+                                            var markY = play.Here.Y - (int)Math.Round(half * 0.48);
                                             <circle class="sys worm" cx="@markX" cy="@markY" r="@(half * 0.055)"
                                                     fill="none" stroke="#8fd0c6" stroke-width="@(half * 0.012)"
                                                     @onclick="() => selected = wormhole">
@@ -207,7 +207,7 @@ else if (game is GameState play)
                             <div>
                                 <p class="eyebrow">Galactic chart</p>
                                 <div class="chart-wrap">
-                                    <svg class="chart" viewBox="@GalaxyView(play)" role="img" aria-label="Galactic chart centered on @play.Here.Name">
+                                    <svg class="chart" viewBox="@GalaxyView(play)" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Galactic chart centered on @play.Here.Name">
                                         @for (var hole = 0; hole < play.Wormholes.Length; hole++)
                                         {
                                             var from = play.Systems[play.Wormholes[hole]];

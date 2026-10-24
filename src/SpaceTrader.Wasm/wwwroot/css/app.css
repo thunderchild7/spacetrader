@@ -187,15 +187,22 @@ input, select {
     overflow: hidden;
 }
 
-.chart { width: 100%; height: auto; display: block; min-height: 180px; }
+.chart-wrap.round {
+    border-radius: 50%;
+    aspect-ratio: 1;
+}
+
+.chart { width: 100%; height: auto; display: block; min-height: 0; aspect-ratio: 154 / 110; }
+
+.chart.short { aspect-ratio: 1; height: 100%; }
 
 .chart text { fill: var(--muted); font-size: 3px; font-family: ui-monospace, Menlo, sans-serif; pointer-events: none; }
 
 .chart.short text { font-size: 1.7px; }
 
-.chart .fuel { fill: none; stroke: #e0b15a; stroke-width: 0.45; stroke-opacity: .7; pointer-events: none; }
+.chart .fuel { fill: rgba(224, 177, 90, .08); stroke: #e0b15a; stroke-width: 0.7; pointer-events: none; }
 
-.chart.short .fuel { stroke-width: 0.22; }
+.chart.short .fuel { stroke-width: 0.8; }
 
 .sys { cursor: pointer; }
 

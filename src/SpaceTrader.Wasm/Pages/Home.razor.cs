@@ -223,11 +223,7 @@ public partial class Home
 
     bool QuestLinesExist() => game is not null && (game.JaporiQuest == 1 || game.Artifact || game.JarekQuest == 1 || game.MonsterAlive || game.Tribbles > 0);
 
-    static int ShortHalf(GameState game)
-    {
-        var reach = Math.Max(game.Fuel, 1);
-        return reach + Math.Max(2, reach / 6);
-    }
+    static int ShortHalf(GameState game) => Math.Max(game.Fuel, 1);
 
     static string ShortView(GameState game)
     {
